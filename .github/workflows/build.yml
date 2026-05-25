@@ -1,0 +1,38 @@
+name: MetalRate iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - "codex/**"
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XCODE_APP=$(ls /Applications/ | grep "^Xcode_" | sort -V | tail -1)
+          if [ -n "$XCODE_APP" ]; then
+            sudo xcode-select -s "/Applications/$XCODE_APP"
+          fi
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for simulator
+        run: |
+          xcodebuild build \
+            -project MetalRate.xcodeproj \
+            -scheme MetalRate \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,name=iPhone 16,OS=latest" \
+            CODE_SIGNING_ALLOWED=NO
