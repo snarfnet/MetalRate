@@ -74,7 +74,7 @@ struct ContentView: View {
 
     private var currencyToggle: some View {
         HStack(spacing: 0) {
-            toggleButton(title: "JPY \u00a5", active: showJPY) { showJPY = true }
+            toggleButton(title: "JPY ¥", active: showJPY) { showJPY = true }
             toggleButton(title: "USD $", active: !showJPY) { showJPY = false }
         }
         .background(Color.white.opacity(0.06), in: Capsule())
