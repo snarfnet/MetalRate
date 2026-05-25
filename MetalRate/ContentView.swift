@@ -6,50 +6,53 @@ struct ContentView: View {
     @State private var selectedCategory: MetalCategory?
 
     private var filteredMetals: [MetalInfo] {
-        if let cat = selectedCategory {
-            return service.metals.filter { $0.category == cat }
+        if let selectedCategory {
+            return service.metals.filter { $0.category == selectedCategory }
         }
         return service.metals
     }
 
     var body: some View {
         ZStack {
-            Theme.bg.ignoresSafeArea()
+            MetalBackground()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     header
+                    marketStrip
                     currencyToggle
                     categoryFilter
-                    rateInfo
 
                     ForEach(filteredMetals) { metal in
                         MetalCard(metal: metal, showJPY: showJPY)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .padding(.top, 18)
                 .padding(.bottom, 80)
             }
         }
-        .task {
-            await service.fetchPrices()
-        }
-        .refreshable {
-            await service.fetchPrices()
+        .task { await service.fetchPrices() }
+        .refreshable { await service.fetchPrices() }
+        .safeAreaInset(edge: .bottom) {
+            AdMobBannerView(adUnitID: AdMobConfig.bannerAdUnitID)
+                .background(.black.opacity(0.84))
         }
         .preferredColorScheme(.dark)
     }
 
     private var header: some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("METAL RATE")
-                    .font(.system(size: 14, weight: .black, design: .monospaced))
+                    .font(.system(size: 13, weight: .black, design: .monospaced))
                     .foregroundStyle(Theme.gold)
                 Text("金属相場")
-                    .font(.system(size: 36, weight: .black))
+                    .font(.system(size: 38, weight: .black))
                     .foregroundStyle(.white)
+                Text("貴金属と産業金属の価格をすばやく確認")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.62))
             }
             Spacer()
             Button {
@@ -57,11 +60,10 @@ struct ContentView: View {
             } label: {
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 48, height: 48)
+                        .fill(.white.opacity(0.10))
+                        .frame(width: 50, height: 50)
                     if service.isLoading {
-                        ProgressView()
-                            .tint(Theme.gold)
+                        ProgressView().tint(Theme.gold)
                     } else {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 18, weight: .bold))
@@ -70,6 +72,26 @@ struct ContentView: View {
                 }
             }
         }
+        .padding(18)
+        .background(.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.white.opacity(0.10)))
+    }
+
+    private var marketStrip: some View {
+        HStack {
+            if let date = service.lastUpdated {
+                Label(date.formatted(.dateTime.hour().minute()), systemImage: "clock")
+            } else {
+                Label("取得待ち", systemImage: "clock")
+            }
+            Spacer()
+            Text("USD/JPY \(service.usdJpy, specifier: "%.2f")")
+        }
+        .font(.system(size: 12, weight: .bold, design: .monospaced))
+        .foregroundStyle(.white.opacity(0.62))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.white.opacity(0.07), in: Capsule())
     }
 
     private var currencyToggle: some View {
@@ -77,15 +99,15 @@ struct ContentView: View {
             toggleButton(title: "JPY ¥", active: showJPY) { showJPY = true }
             toggleButton(title: "USD $", active: !showJPY) { showJPY = false }
         }
-        .background(Color.white.opacity(0.06), in: Capsule())
+        .background(.white.opacity(0.08), in: Capsule())
     }
 
     private func toggleButton(title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 15, weight: .bold, design: .monospaced))
-                .foregroundStyle(active ? .black : .white.opacity(0.5))
-                .frame(maxWidth: .infinity, minHeight: 38)
+                .font(.system(size: 15, weight: .black, design: .monospaced))
+                .foregroundStyle(active ? .black : .white.opacity(0.55))
+                .frame(maxWidth: .infinity, minHeight: 40)
                 .background(active ? Theme.gold : .clear, in: Capsule())
         }
     }
@@ -106,29 +128,13 @@ struct ContentView: View {
         } label: {
             Text(title)
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(selectedCategory == cat ? .black : .white.opacity(0.5))
+                .foregroundStyle(selectedCategory == cat ? .black : .white.opacity(0.58))
                 .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(selectedCategory == cat ? Theme.gold : Color.white.opacity(0.06), in: Capsule())
-        }
-    }
-
-    private var rateInfo: some View {
-        HStack {
-            if let date = service.lastUpdated {
-                Text("更新: \(date.formatted(.dateTime.hour().minute()))")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.35))
-            }
-            Spacer()
-            Text("USD/JPY: \(service.usdJpy, specifier: "%.2f")")
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundStyle(Theme.gold.opacity(0.7))
+                .padding(.vertical, 8)
+                .background(selectedCategory == cat ? Theme.gold : .white.opacity(0.08), in: Capsule())
         }
     }
 }
-
-// MARK: - Metal Card
 
 private struct MetalCard: View {
     let metal: MetalInfo
@@ -137,11 +143,8 @@ private struct MetalCard: View {
     private var displayPrice: String {
         let price = showJPY ? metal.priceJPY : metal.priceUSD
         if price == 0 { return "--" }
-        if price >= 1000 {
-            return String(format: "%,.0f", price)
-        } else if price >= 10 {
-            return String(format: "%.2f", price)
-        }
+        if price >= 1000 { return String(format: "%,.0f", price) }
+        if price >= 10 { return String(format: "%.2f", price) }
         return String(format: "%.4f", price)
     }
 
@@ -151,74 +154,74 @@ private struct MetalCard: View {
 
     private var metalColor: Color {
         switch metal.id {
-        case "gold": return Color(red: 1.0, green: 0.84, blue: 0.0)
-        case "silver": return Color(red: 0.75, green: 0.75, blue: 0.78)
-        case "platinum": return Color(red: 0.88, green: 0.88, blue: 0.90)
-        case "palladium": return Color(red: 0.72, green: 0.72, blue: 0.76)
-        case "copper": return Color(red: 0.85, green: 0.55, blue: 0.30)
-        case "aluminum": return Color(red: 0.80, green: 0.82, blue: 0.85)
-        case "nickel": return Color(red: 0.65, green: 0.70, blue: 0.68)
-        case "zinc": return Color(red: 0.60, green: 0.65, blue: 0.72)
-        case "lead": return Color(red: 0.50, green: 0.50, blue: 0.55)
-        case "tin": return Color(red: 0.75, green: 0.78, blue: 0.72)
-        default: return .gray
+        case "gold": return Color(red: 1.0, green: 0.82, blue: 0.18)
+        case "silver": return Color(red: 0.78, green: 0.80, blue: 0.84)
+        case "platinum": return Color(red: 0.88, green: 0.90, blue: 0.92)
+        case "palladium": return Color(red: 0.68, green: 0.72, blue: 0.78)
+        case "copper": return Color(red: 0.92, green: 0.52, blue: 0.27)
+        default: return Color(red: 0.62, green: 0.70, blue: 0.72)
         }
     }
 
     var body: some View {
         HStack(spacing: 14) {
-            // Metal icon
             ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(metalColor.opacity(0.15))
-                    .frame(width: 52, height: 52)
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(metalColor.opacity(0.16))
+                    .frame(width: 56, height: 56)
                 Text(metal.symbol)
                     .font(.system(size: 16, weight: .black, design: .monospaced))
                     .foregroundStyle(metalColor)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text(metal.name)
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
                     Text(metal.nameEn)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.white.opacity(0.42))
                 }
                 Text(metal.category.rawValue)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(metalColor.opacity(0.8))
+                    .foregroundStyle(metalColor)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(metalColor.opacity(0.1), in: Capsule())
+                    .padding(.vertical, 3)
+                    .background(metalColor.opacity(0.12), in: Capsule())
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 3) {
-                HStack(spacing: 2) {
-                    Text(currencySymbol)
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Theme.gold.opacity(0.7))
-                    Text(displayPrice)
-                        .font(.system(size: 20, weight: .black, design: .monospaced))
-                        .foregroundStyle(.white)
-                }
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(currencySymbol)\(displayPrice)")
+                    .font(.system(size: 20, weight: .black, design: .monospaced))
                 Text("/ \(metal.unit)")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.35))
+                    .foregroundStyle(.white.opacity(0.38))
             }
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(metalColor.opacity(0.12)))
+        .foregroundStyle(.white)
+        .padding(15)
+        .background(.black.opacity(0.32), in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(metalColor.opacity(0.24)))
     }
 }
 
-// MARK: - Theme
+private struct MetalBackground: View {
+    var body: some View {
+        ZStack {
+            Color(red: 0.04, green: 0.04, blue: 0.055).ignoresSafeArea()
+            Image("HeroArtwork")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
+                .opacity(0.44)
+            LinearGradient(colors: [.black.opacity(0.06), .black.opacity(0.86)], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        }
+    }
+}
 
 private enum Theme {
-    static let bg = Color(red: 0.07, green: 0.07, blue: 0.10)
-    static let gold = Color(red: 1.0, green: 0.84, blue: 0.0)
+    static let gold = Color(red: 1.0, green: 0.78, blue: 0.22)
 }
