@@ -20,13 +20,13 @@ enum MetalCategory: String, CaseIterable {
 
 @Observable
 final class MetalService {
-    var metals: [MetalInfo] = Self.defaultMetals()
+    var metals: [MetalInfo] = MetalService.makeDefaultMetals()
     var lastUpdated: Date?
     var isLoading = false
     var errorMessage: String?
     var usdJpy: Double = 157.0
 
-    private static func defaultMetals() -> [MetalInfo] {
+    private static func makeDefaultMetals() -> [MetalInfo] {
         [
             MetalInfo(id: "gold", name: "金", nameEn: "Gold", symbol: "XAU", icon: "circle.fill", category: .precious),
             MetalInfo(id: "silver", name: "銀", nameEn: "Silver", symbol: "XAG", icon: "circle.fill", category: .precious),
